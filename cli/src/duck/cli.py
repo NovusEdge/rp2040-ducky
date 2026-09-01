@@ -98,21 +98,54 @@ def _flash_to(drive: Path, uf2: Path = UF2) -> None:
     print(f"flashed -> {drive}")
 
 
-def _find_drive() -> Path | None:
+def _find_volume(labels: tuple[str, ...]) -> Path | None:
+    # The board mounts under a different root per OS: a user media dir on Linux,
+    # /Volumes on macOS, a drive letter on Windows.
+    if sys.platform == "darwin":
+        for label in labels:
+            p = Path("/Volumes") / label
+            if p.is_dir():
+                return p
+        return None
+    if sys.platform == "win32":
+        return _find_windows_volume(labels)
     user = os.environ.get("USER", "")
-    for base in (Path("/run/media") / user, Path("/media") / user, Path("/media")):
-        for label in DRIVE_LABELS:
+    # /mnt covers a fixed mountpoint from the optional udev rule in contrib/.
+    bases = (Path("/run/media") / user, Path("/media") / user, Path("/media"), Path("/mnt"))
+    for base in bases:
+        for label in labels:
             if (base / label).is_dir():
                 return base / label
     return None
 
 
-def _find_circuitpy() -> Path | None:
-    user = os.environ.get("USER", "")
-    for base in (Path("/run/media") / user, Path("/media") / user, Path("/media")):
-        if (base / "CIRCUITPY").is_dir():
-            return base / "CIRCUITPY"
+def _find_windows_volume(labels: tuple[str, ...]) -> Path | None:
+    import ctypes
+    import string
+
+    kernel32 = ctypes.windll.kernel32
+    mask = kernel32.GetLogicalDrives()
+    name = ctypes.create_unicode_buffer(261)  # MAX_PATH + 1
+    for i, letter in enumerate(string.ascii_uppercase):
+        if not (mask >> i) & 1:
+            continue
+        root = f"{letter}:\\"
+        # GetVolumeInformationW writes the volume label into name. The other out
+        # params are optional; pass NULL and a zero-length filesystem buffer.
+        if kernel32.GetVolumeInformationW(
+            ctypes.c_wchar_p(root), name, ctypes.sizeof(name),
+            None, None, None, None, 0,
+        ) and name.value in labels:
+            return Path(root)
     return None
+
+
+def _find_drive() -> Path | None:
+    return _find_volume(DRIVE_LABELS)
+
+
+def _find_circuitpy() -> Path | None:
+    return _find_volume(("CIRCUITPY",))
 
 
 @app.command(name="list")
@@ -190,9 +223,17 @@ def cp_setup(*, wait: bool = True) -> None:
 
 
 @app.command(name="cp-load")
-def cp_load() -> None:
+def cp_load(*, wait: bool = True) -> None:
     """Copy the CircuitPython runtime and payload to a mounted CIRCUITPY drive."""
     drive = _find_circuitpy()
+    if drive is None and wait:
+        # The board re-enumerates after cp-setup or a replug, and the mount can
+        # lag the CLI. Poll so a load right after setup does not miss the drive.
+        print("waiting for CIRCUITPY drive to mount")
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and drive is None:
+            time.sleep(0.5)
+            drive = _find_circuitpy()
     if drive is None:
         raise SystemExit(
             "no CIRCUITPY drive found. Flash CircuitPython first via `duck cp-setup`, then replug the board."

@@ -1,0 +1,18 @@
+# Auto-mount a CircuitPython CIRCUITPY drive to a fixed path. Linux + systemd only.
+#
+# The desktop udisks automounter already mounts CIRCUITPY under
+# /run/media/<user>/CIRCUITPY once a session is up. This rule mounts it to
+# /mnt/CIRCUITPY instead, so the path is stable and present before a desktop
+# session. UDISKS_IGNORE stops udisks from mounting the same device twice.
+#
+# vfat has no unix permissions, so uid/gid in the mount options set the owner.
+# Replace 1000 with your own ids: run `id -u` and `id -g`.
+#
+# Install: see contrib/README.md in this directory.
+
+SUBSYSTEM=="block", ACTION=="add", ENV{ID_FS_LABEL}=="CIRCUITPY", \
+  TAG+="systemd", ENV{UDISKS_IGNORE}="1", \
+  RUN{program}+="/usr/bin/systemd-mount --no-block --automount=yes --collect $devnode /mnt/CIRCUITPY -o uid=1000,gid=1000,umask=022,flush"
+
+SUBSYSTEM=="block", ACTION=="remove", ENV{ID_FS_LABEL}=="CIRCUITPY", \
+  RUN{program}+="/usr/bin/systemd-umount /mnt/CIRCUITPY"
