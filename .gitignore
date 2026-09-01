@@ -5,6 +5,9 @@ build/
 *.bin
 *.hex
 
+# The CircuitPython runtime image ships in the repo; the *.uf2 rule above hides it.
+!runtimes/circuitpython/firmware/*.uf2
+
 # Python / uv
 __pycache__/
 *.py[cod]

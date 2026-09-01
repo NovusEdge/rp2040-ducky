@@ -18,9 +18,9 @@ app = App(
 
 def _root() -> Path:
     for d in Path(__file__).resolve().parents:
-        if (d / "CMakeLists.txt").is_file():
-            return d
-    raise SystemExit("cannot locate project root (no CMakeLists.txt above this file)")
+        if (d / "runtimes" / "pico-sdk" / "CMakeLists.txt").is_file():
+            return d / "runtimes" / "pico-sdk"
+    raise SystemExit("cannot locate firmware (no runtimes/pico-sdk/CMakeLists.txt above this file)")
 
 
 ROOT = _root()
@@ -30,6 +30,9 @@ UF2 = BUILD / "rp2040_ducky.uf2"
 DEFAULT_PAYLOAD = "linux/rickroll"
 # BOOTSEL mounts as RPI-RP2 on RP2040 boards, RP2350 on newer ones.
 DRIVE_LABELS = ("RPI-RP2", "RP2350")
+
+CIRCUITPY = ROOT.parent.parent / "runtimes" / "circuitpython"
+CIRCUITPY_FILES = ("code.py", "boot.py", "duckyinpython.py", "pins.py", "payload.dd")
 
 
 class Board(str, Enum):
@@ -68,12 +71,12 @@ def _build(payload: str, board: Board) -> None:
     print(f"built {UF2.relative_to(ROOT)}  [{payload}, {board.value}]")
 
 
-def _flash_to(drive: Path) -> None:
+def _flash_to(drive: Path, uf2: Path = UF2) -> None:
     # The RPI-RP2 mount is not writable for a short time after it appears. The
     # board unmounts the moment a full UF2 lands. So retry a transient EACCES
     # or EROFS. Treat a disconnect after the write as success.
-    dst = drive / UF2.name
-    data = UF2.read_bytes()
+    dst = drive / uf2.name
+    data = uf2.read_bytes()
     deadline = time.monotonic() + 10
     while True:
         try:
@@ -101,6 +104,14 @@ def _find_drive() -> Path | None:
         for label in DRIVE_LABELS:
             if (base / label).is_dir():
                 return base / label
+    return None
+
+
+def _find_circuitpy() -> Path | None:
+    user = os.environ.get("USER", "")
+    for base in (Path("/run/media") / user, Path("/media") / user, Path("/media")):
+        if (base / "CIRCUITPY").is_dir():
+            return base / "CIRCUITPY"
     return None
 
 
@@ -156,6 +167,40 @@ def edit(payload: str = DEFAULT_PAYLOAD) -> None:
     """Open a payload in $EDITOR."""
     path = PAYLOADS / _resolve(payload) / "payload.h"
     subprocess.run([os.environ.get("EDITOR", "vi"), str(path)])
+
+
+@app.command(name="cp-setup")
+def cp_setup(*, wait: bool = True) -> None:
+    """Copy the CircuitPython .uf2 to a board in BOOTSEL mode."""
+    uf2s = list((CIRCUITPY / "firmware").glob("*.uf2"))
+    if len(uf2s) != 1:
+        raise SystemExit(
+            f"expected exactly one .uf2 under {CIRCUITPY / 'firmware'}, found {len(uf2s)}"
+        )
+    drive = _find_drive()
+    if drive is None and wait:
+        print("waiting for BOOTSEL drive — hold BOOT, tap RESET, release BOOT")
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and drive is None:
+            time.sleep(0.5)
+            drive = _find_drive()
+    if drive is None:
+        raise SystemExit("no BOOTSEL drive found. Put the board in BOOTSEL and retry.")
+    _flash_to(drive, uf2s[0])
+
+
+@app.command(name="cp-load")
+def cp_load() -> None:
+    """Copy the CircuitPython runtime and payload to a mounted CIRCUITPY drive."""
+    drive = _find_circuitpy()
+    if drive is None:
+        raise SystemExit(
+            "no CIRCUITPY drive found. Flash CircuitPython first via `duck cp-setup`, then replug the board."
+        )
+    for name in CIRCUITPY_FILES:
+        shutil.copy2(CIRCUITPY / name, drive / name)
+    shutil.copytree(CIRCUITPY / "lib", drive / "lib", dirs_exist_ok=True)
+    print(f"loaded -> {drive}")
 
 
 @app.command
