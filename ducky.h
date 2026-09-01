@@ -29,10 +29,11 @@ typedef struct {
 #define KEY_R     HID_KEY_R
 #define KEY_T     HID_KEY_T
 
-// Walks the step list once, one USB report per call. Call every main-loop
-// iteration while the device is mounted; it no-ops after the last step.
+// Sends one USB report per call and walks the step list one time. Call this
+// each main-loop iteration while the device is mounted. It does nothing after
+// the last step.
 void ducky_run(const duck_step_t *steps, size_t count);
 
-// Rewinds to the first step. Call on each fresh mount so a replug or a
-// suspend/resume replays the payload without a reflash.
+// Sets the runner back to the first step. Call this on each new mount. A
+// replug or a suspend/resume then replays the payload without a reflash.
 void ducky_reset(void);

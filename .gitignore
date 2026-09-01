@@ -1,1 +1,21 @@
+# C / Pico SDK build output
 build/
+*.uf2
+*.elf
+*.bin
+*.hex
+
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

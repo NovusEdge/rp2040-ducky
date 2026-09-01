@@ -1,10 +1,10 @@
 #pragma once
 #include "ducky.h"
 
-// Ctrl+Alt+T is the GNOME/Ubuntu default "open a terminal" shortcut. A desktop
-// that unbinds it, or a non-GNOME session, needs a different opener. xdg-open
-// hands the URL to whatever the target set as its default browser. Single
-// quotes keep the shell from globbing the '?' in the URL.
+// Ctrl+Alt+T is the default "open a terminal" shortcut on GNOME and Ubuntu.
+// A desktop that unbinds it needs a different opener. A non-GNOME session also
+// needs a different opener. xdg-open sends the URL to the default browser on
+// the target. The single quotes stop the shell from expanding the '?' in the URL.
 static const duck_step_t PAYLOAD[] = {
     DELAY(1500),
     KEY(MOD_CTRL | MOD_ALT, KEY_T),

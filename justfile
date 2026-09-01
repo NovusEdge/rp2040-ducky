@@ -1,37 +1,44 @@
-# PICO_SDK_PATH from the environment wins; otherwise the AUR install location.
-pico_sdk_path := env_var_or_default("PICO_SDK_PATH", "/usr/share/pico-sdk")
-# "pico" = RP2040, "pico2" = RP2350. Switching requires `just rebuild`.
-board := env_var_or_default("PICO_BOARD", "pico")
-# which payload to compile in: <os>/<name> under payloads/.
-payload := env_var_or_default("PAYLOAD", "linux/rickroll")
+# Thin wrappers over the duck CLI (cyclopts, in cli/, run via uv).
+# Pass a payload and flags straight through, e.g.
+#   just build mac/rickroll --board pico2
+#   just flash linux/rickroll
+
+duck := "uv run --project cli duck"
 
 _default:
-    @just --list
+    @just --list --unsorted --list-heading $'rp2040-ducky\nusage: just <recipe> [payload] [--board pico|pico2]\nargs:  just <recipe> --help   (full arguments for a recipe)\n\n'
 
 # configure and compile -> build/rp2040_ducky.uf2
-build:
-    cmake -B build -DPICO_SDK_PATH={{pico_sdk_path}} -DPICO_BOARD={{board}} -DPAYLOAD={{payload}}
-    cmake --build build
+[group('build')]
+build *ARGS:
+    {{duck}} build {{ARGS}}
+
+# clean, then build
+[group('build')]
+rebuild *ARGS:
+    {{duck}} rebuild {{ARGS}}
 
 # delete the build directory
+[group('build')]
 clean:
-    rm -rf build
+    {{duck}} clean
 
-# clean then build from scratch
-rebuild: clean build
+# build, then copy the .uf2 to a board in BOOTSEL mode
+[group('flash')]
+flash *ARGS:
+    {{duck}} flash {{ARGS}}
 
-# build, then copy the .uf2 to a board held in BOOTSEL mode
-flash: build
-    #!/usr/bin/env bash
-    set -euo pipefail
-    drive="/run/media/$USER/RPI-RP2"
-    if [ ! -d "$drive" ]; then
-        echo "RPI-RP2 not mounted. Hold BOOTSEL, plug the board in, then rerun." >&2
-        exit 1
-    fi
-    cp build/rp2040_ducky.uf2 "$drive"/
-    echo "flashed -> $drive"
+# list available payloads
+[group('payloads')]
+list:
+    {{duck}} list
 
-# open the selected payload in your editor
-edit:
-    ${EDITOR:-vi} payloads/{{payload}}/payload.h
+# open a payload in $EDITOR
+[group('payloads')]
+edit *ARGS:
+    {{duck}} edit {{ARGS}}
+
+# interactive picker: payload, board, action
+[group('payloads')]
+tui:
+    {{duck}} tui

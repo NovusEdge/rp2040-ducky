@@ -1,0 +1,20 @@
+[project]
+name = "duck"
+version = "0.1.0"
+description = "rp2040-ducky build and flash CLI"
+readme = "README.md"
+authors = [
+    { name = "NovusEdge", email = "novusedge0@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "cyclopts>=4.23.3",
+    "questionary>=2.1.1",
+]
+
+[project.scripts]
+duck = "duck.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.9,<0.10.0"]
+build-backend = "uv_build"

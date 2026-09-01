@@ -1,11 +1,26 @@
 #include "bsp/board.h"
+#include "hardware/resets.h"
 #include "tusb.h"
 #include "ducky.h"
 #include PAYLOAD_HEADER
 
 int main(void) {
+    // USB re-enumeration hardening for a warm RESET. First reset the USB block.
+    // Then drop D+ long enough for the host to detect a clean disconnect.
+    // A genuine Pico or WeAct board then re-enumerates on RESET.
+    // This does not fix the clone used here. That clone enumerates one time per
+    // bootrom handoff. It never re-enumerates on a RESET or a replug (TinyUSB
+    // #1730). CircuitPython re-enumerates on RESET on the same board. The fix
+    // is firmware-side and still unknown. See NOTES.md.
+    reset_block(RESETS_RESET_USBCTRL_BITS);
+    unreset_block_wait(RESETS_RESET_USBCTRL_BITS);
+
     board_init();
     tud_init(0);
+
+    tud_disconnect();
+    board_delay(300);
+    tud_connect();
 
     const size_t count = sizeof(PAYLOAD) / sizeof(PAYLOAD[0]);
     bool was_mounted = false;
@@ -21,8 +36,8 @@ int main(void) {
     }
 }
 
-// Required by TinyUSB. The host never reads from or writes to this keyboard,
-// so both are no-ops.
+// TinyUSB requires these callbacks. The host never reads this keyboard and
+// never writes to it. Both callbacks do nothing.
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
                                hid_report_type_t report_type, uint8_t *buffer,
                                uint16_t reqlen) {
