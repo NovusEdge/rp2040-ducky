@@ -26,6 +26,8 @@ void ducky_reset(void) {
   delay_started = false;
 }
 
+bool ducky_done(size_t count) { return idx >= count; }
+
 void ducky_run(const duck_step_t* steps, size_t count) {
   if (idx >= count) return;
   if (board_millis() - last_ms < POLL_INTERVAL_MS) return;

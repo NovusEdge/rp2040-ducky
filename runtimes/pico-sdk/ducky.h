@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "tusb.h"
@@ -37,3 +38,7 @@ void ducky_run(const duck_step_t *steps, size_t count);
 // Sets the runner back to the first step. Call this on each new mount. A
 // replug or a suspend/resume then replays the payload without a reflash.
 void ducky_reset(void);
+
+// True once the runner has walked past the last step. Pass the same count given
+// to ducky_run. Used to time a soft re-enumerate for replay.
+bool ducky_done(size_t count);
