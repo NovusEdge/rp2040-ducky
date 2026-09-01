@@ -42,3 +42,13 @@ edit *ARGS:
 [group('payloads')]
 tui:
     {{duck}} tui
+
+# copy the CircuitPython .uf2 to a board in BOOTSEL mode
+[group('circuitpython')]
+cp-setup:
+    {{duck}} cp-setup
+
+# copy the CircuitPython runtime + payload to a mounted CIRCUITPY drive
+[group('circuitpython')]
+cp-load:
+    {{duck}} cp-load
