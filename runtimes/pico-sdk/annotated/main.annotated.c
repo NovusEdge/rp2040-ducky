@@ -21,18 +21,22 @@ int main(void) {
   // and the ducky never types. The three calls below force the host to see a
   // disconnect and then a fresh connect, so enumeration runs again.
   //
-  // The long comment in the real file records a known limit: one cheap clone
-  // enumerates only once per power-up and ignores this dance. Stock
-  // CircuitPython re-enumerates on that same clone because it carries a chip
-  // errata workaround. That is why the CircuitPython runtime exists next door.
+  // The long comment in the real file records a hardware limit on the clone
+  // used here. The board re-enumerates on RESET only sometimes. The cause is
+  // erratum RP2040-E5: the USB device needs ~800us of idle bus after a reset to
+  // leave RESET, and a busy host may not give it. The build sets
+  // PICO_RP2040_USB_DEVICE_ENUMERATION_FIX, the SDK workaround that forces that
+  // idle window. NOTES.md next to this file holds the full evidence.
   //
-  // USB re-enumeration hardening for a warm RESET. First reset the USB block.
-  // Then drop D+ long enough for the host to detect a clean disconnect.
-  // A genuine Pico or WeAct board then re-enumerates on RESET.
-  // This does not fix the clone used here. That clone enumerates one time per
-  // bootrom handoff. It never re-enumerates on a RESET or a replug (TinyUSB
-  // #1730). CircuitPython re-enumerates on RESET on the same board. The fix
-  // is firmware-side and still unknown. See NOTES.md.
+  // USB re-enumeration on a warm RESET is unreliable on the clone used here.
+  // The board enumerates once per bootrom handoff. A RESET can drop it off the
+  // bus with no re-enumeration. Root cause is RP2040-E5: the device needs
+  // ~800us of idle bus after a reset to leave RESET, which a busy host may
+  // never provide (TinyUSB #1730). Both this firmware and CircuitPython have
+  // re-enumerated on RESET on this board on some runs and failed on others.
+  // The build now sets PICO_RP2040_USB_DEVICE_ENUMERATION_FIX, the SDK errata
+  // workaround that forces that idle window; the sequence below still helps a
+  // genuine Pico or WeAct. See NOTES.md.
 
   // Reset the USB hardware block, then wait for it to come back. reset_block
   // holds the block in reset; unreset_block_wait releases it and blocks until

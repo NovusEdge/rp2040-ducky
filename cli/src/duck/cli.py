@@ -58,17 +58,21 @@ def _sdk() -> str:
     return os.environ.get("PICO_SDK_PATH", "/usr/share/pico-sdk")
 
 
-def _build(payload: str, board: Board) -> None:
+def _build(payload: str, board: Board, replay_ms: int = 0) -> None:
     _resolve(payload)
+    # Always pass DUCKY_REPLAY_MS so a prior non-zero value in the CMake cache
+    # does not linger when the flag is dropped.
     subprocess.run(
         ["cmake", "-B", str(BUILD),
          f"-DPICO_SDK_PATH={_sdk()}",
          f"-DPICO_BOARD={board.value}",
-         f"-DPAYLOAD={payload}"],
+         f"-DPAYLOAD={payload}",
+         f"-DDUCKY_REPLAY_MS={replay_ms}"],
         cwd=ROOT, check=True,
     )
     subprocess.run(["cmake", "--build", str(BUILD)], cwd=ROOT, check=True)
-    print(f"built {UF2.relative_to(ROOT)}  [{payload}, {board.value}]")
+    replay = f", replay {replay_ms}ms" if replay_ms > 0 else ""
+    print(f"built {UF2.relative_to(ROOT)}  [{payload}, {board.value}{replay}]")
 
 
 def _flash_to(drive: Path, uf2: Path = UF2) -> None:
@@ -155,16 +159,20 @@ def list_() -> None:
 
 
 @app.command
-def build(payload: str = DEFAULT_PAYLOAD, *, board: Board = Board.pico) -> None:
-    """Configure and compile the firmware."""
-    _build(payload, board)
+def build(
+    payload: str = DEFAULT_PAYLOAD, *, board: Board = Board.pico, replay_ms: int = 0
+) -> None:
+    """Configure and compile the firmware. --replay-ms N re-runs the payload every N ms via a soft USB re-enumerate."""
+    _build(payload, board, replay_ms)
 
 
 @app.command
-def rebuild(payload: str = DEFAULT_PAYLOAD, *, board: Board = Board.pico) -> None:
+def rebuild(
+    payload: str = DEFAULT_PAYLOAD, *, board: Board = Board.pico, replay_ms: int = 0
+) -> None:
     """Delete the build directory, then build."""
     shutil.rmtree(BUILD, ignore_errors=True)
-    _build(payload, board)
+    _build(payload, board, replay_ms)
 
 
 @app.command
@@ -173,9 +181,10 @@ def flash(
     *,
     board: Board = Board.pico,
     wait: bool = True,
+    replay_ms: int = 0,
 ) -> None:
     """Build, then copy the .uf2 to a board in BOOTSEL mode."""
-    _build(payload, board)
+    _build(payload, board, replay_ms)
     drive = _find_drive()
     if drive is None and wait:
         print("waiting for BOOTSEL drive — hold BOOT, tap RESET, release BOOT")
