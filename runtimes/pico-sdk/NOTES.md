@@ -69,8 +69,17 @@ replug. This is the mechanism the hardware RESET could not achieve.
 
 Caveat: replay types into whatever window has focus on the host, on every cycle.
 
-Untried, if pursued later: DMM check of the D+ idle level and pullup (~1.5k to
-3V3) to confirm the reset-path hardware cause.
+Cold-plug enumeration stays a coin flip on this clone + this host: a plug fires
+only when it enumerates, and enumeration intermittently fails (the erratum idle
+window is bus-timing dependent). No pure-firmware fix reaches it, because the SDK
+workaround drives a pin that does not connect to this board's USB lines. The
+failures are all on one dev laptop; a quieter port, a USB2 port, or a target
+machine with different bus timing often enumerates every time.
+
+Planned hardware fix (deferred until a soldering iron and DMM are on hand):
+measure the D+ idle voltage and the pullup resistance to 3V3. A genuine device
+has ~1.5k on D+. If it is missing or wrong on this clone, add the correct pullup.
+That is the likely root cause of the reset-path enumeration failure.
 
 If the enumeration fix does not close it, the reliable fallback is a
 `watchdog_reboot()` cold reboot through the bootrom (the path a BOOTSEL replug
